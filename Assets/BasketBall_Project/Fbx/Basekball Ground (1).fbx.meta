@@ -3,7 +3,67 @@ guid: 259ac92128371d64cbd5c4a82480573a
 ModelImporter:
   serializedVersion: 22200
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Concrete__Outdoor
+    second: {fileID: 2100000, guid: b1ed20d3b7c6ee1409760a41b67533e0, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Damaged_painted_metal
+    second: {fileID: 2100000, guid: 0fd86411d93ce9b4c8fee0b93cf225f3, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Galvanized_steel
+    second: {fileID: 2100000, guid: 86bcece0fa2fcb948bd708e0d8bbe91a, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Light_Maple_Wood
+    second: {fileID: 2100000, guid: 19e7f965c74476148be1e1d0200b582a, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Material.001
+    second: {fileID: 2100000, guid: 1ab73a776c54e864aa6ae47bb38c6980, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Material.003
+    second: {fileID: 2100000, guid: 8411e554bc50477499fcacea6189355d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Material.004
+    second: {fileID: 2100000, guid: cae0439bc578edf47bde1d0603f50154, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Material.009
+    second: {fileID: 2100000, guid: 4fa83db099721e24a8dc95a4a9b339dc, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Old_Metal
+    second: {fileID: 2100000, guid: 08747a3e2d3e6e74ba7e232c8a44ab6f, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Old_Metal.001
+    second: {fileID: 2100000, guid: 926534b1a3e8e9d4eb2c055a2b77e946, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Old_Metal.002
+    second: {fileID: 2100000, guid: 1242a0dc4d6be9941ad253ee4f60019c, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Old_Metal.003
+    second: {fileID: 2100000, guid: b06a549cfd4f72647808c1c4249cbed9, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0
