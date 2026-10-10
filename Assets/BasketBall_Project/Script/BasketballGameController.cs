@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using PinePie.SimpleJoystick;
 
 /// <summary>Controls the player, basketball, shot preview, and existing Canvas UI.</summary>
@@ -17,6 +18,8 @@ public sealed class BasketballGameController : MonoBehaviour
     public BasketballCanvasUI canvasUI;
     public HoopScoreTrigger scoreTrigger;
     public Animator playerAnimator;
+    public GameObject physicsPanel;
+    public Text physicsPanelText;
 
     [Header("Shot setup")]
     [Min(0.1f)] public float rimHeight = 3.05f;
@@ -37,6 +40,8 @@ public sealed class BasketballGameController : MonoBehaviour
     Vector3 ballSpawnPosition;
     float yaw;
     float charge;
+    float shotElapsedTime;
+    float slowBallTime;
     int aimPointerId = -1;
     Vector2 lastAimPointer;
     Vector2 joystickValue;
@@ -76,6 +81,8 @@ public sealed class BasketballGameController : MonoBehaviour
         arcPreview.receiveShadows = false;
         arcPreview.positionCount = 0;
 
+        if (physicsPanel != null) physicsPanel.SetActive(false);
+
         ballBody.linearVelocity = Vector3.zero;
         ballBody.angularVelocity = Vector3.zero;
         ballBody.isKinematic = true;
@@ -112,9 +119,36 @@ public sealed class BasketballGameController : MonoBehaviour
         }
 
         if (charging) charge = Mathf.Clamp01(charge + Time.deltaTime / chargeSeconds);
-        if (held) UpdateArc(); else arcPreview.positionCount = 0;
+        if (held)
+        {
+            UpdateArc();
+            UpdatePhysicsPanel();
+        }
+        else
+        {
+            arcPreview.positionCount = 0;
+            if (physicsPanel != null) physicsPanel.SetActive(false);
+        }
         UpdateCamera();
-        if (shotInFlight && basketball.position.y < -2f) FinishShot(false);
+        if (shotInFlight)
+        {
+            shotElapsedTime += Time.deltaTime;
+            if (basketball.position.y < -2f)
+            {
+                FinishShot(false);
+            }
+            else
+            {
+                if (ballBody.linearVelocity.sqrMagnitude <= .04f)
+                    slowBallTime += Time.deltaTime;
+                else
+                    slowBallTime = 0f;
+
+                // Recover shots trapped against the fence or stuck on the court.
+                if (slowBallTime >= 1.25f || shotElapsedTime >= 8f)
+                    FinishShot(false);
+            }
+        }
     }
 
     void ReadAimInput()
@@ -170,8 +204,6 @@ public sealed class BasketballGameController : MonoBehaviour
         gameCamera.transform.rotation = Quaternion.Slerp(gameCamera.transform.rotation, Quaternion.LookRotation(look - gameCamera.transform.position, Vector3.up), follow);
     }
 
-    bool CanGrab() => !held && !shotInFlight && Vector3.Distance(playerRoot.position, basketball.position) <= 3f;
-
     public void GrabOrAim()
     {
         if (held)
@@ -179,11 +211,18 @@ public sealed class BasketballGameController : MonoBehaviour
             resultText = "Drag to aim, hold SHOOT to charge";
             return;
         }
-        if (shotInFlight) return;
-        if (!CanGrab())
+        CancelInvoke(nameof(RespawnBall));
+        shotInFlight = false;
+        charging = false;
+        if (basketball.parent != null) basketball.SetParent(null, true);
+        ballBody.linearVelocity = Vector3.zero;
+        ballBody.angularVelocity = Vector3.zero;
+        ballBody.isKinematic = true;
+        ballCollider.enabled = true;
+        if (Vector3.Distance(playerRoot.position, basketball.position) > 3f)
         {
-            resultText = "Move closer to the ball";
-            return;
+            Vector3 forward = Quaternion.Euler(0f, playerRoot.eulerAngles.y, 0f) * Vector3.forward;
+            basketball.position = playerRoot.position + forward * .8f + Vector3.up * (ballDiameter * .5f);
         }
 
         held = true;
@@ -220,6 +259,8 @@ public sealed class BasketballGameController : MonoBehaviour
         ballBody.angularVelocity = Vector3.Cross(Vector3.up, shotDirection) * 18f;
         held = false;
         shotInFlight = true;
+        shotElapsedTime = 0f;
+        slowBallTime = 0f;
         attempts++;
         resultText = "Shot in flight";
     }
@@ -254,6 +295,56 @@ public sealed class BasketballGameController : MonoBehaviour
         arcProperties.SetColor("_BaseColor", color);
         arcProperties.SetColor("_Color", color);
         arcPreview.SetPropertyBlock(arcProperties);
+    }
+
+    void UpdatePhysicsPanel()
+    {
+        if (physicsPanel != null && !physicsPanel.activeSelf) physicsPanel.SetActive(true);
+        if (physicsPanelText == null) return;
+
+        Vector3 releasePoint = handAnchor.position;
+        Vector3 toHoop = hoopCenter - releasePoint;
+        Vector3 planarToHoop = Vector3.ProjectOnPlane(toHoop, Vector3.up);
+        float distance = Vector3.Dot(planarToHoop, shotDirection);
+        float heightDifference = hoopCenter.y - releasePoint.y;
+        float angle = launchAngle * Mathf.Deg2Rad;
+        float speed = Mathf.Lerp(MinSpeed, MaxSpeed, charging ? charge : .25f);
+        float horizontalSpeed = speed * Mathf.Cos(angle);
+        float verticalSpeed = speed * Mathf.Sin(angle);
+        float flightTime = horizontalSpeed > .001f && distance > 0f ? distance / horizontalSpeed : 0f;
+        float apexHeight = releasePoint.y + verticalSpeed * verticalSpeed / (2f * Gravity);
+
+        float denominator = 2f * Mathf.Cos(angle) * Mathf.Cos(angle) * (distance * Mathf.Tan(angle) - heightDifference);
+        string idealSpeed = denominator > .0001f && distance > 0f
+            ? $"{Mathf.Sqrt(Gravity * distance * distance / denominator):0.00} m/s"
+            : "Angle too low";
+
+        string rangeResult = "--";
+        float discriminant = verticalSpeed * verticalSpeed - 2f * Gravity * heightDifference;
+        if (distance > 0f && discriminant >= 0f)
+        {
+            float descendingTime = (verticalSpeed + Mathf.Sqrt(discriminant)) / Gravity;
+            float horizontalAtRimHeight = horizontalSpeed * descendingTime;
+            float rangeDifference = horizontalAtRimHeight - distance;
+            rangeResult = Mathf.Abs(rangeDifference) < .01f
+                ? "On target"
+                : $"{(rangeDifference > 0f ? "Long" : "Short")} by {Mathf.Abs(rangeDifference):0.00} m";
+        }
+        else if (distance > 0f && apexHeight < hoopCenter.y)
+        {
+            rangeResult = "Short (below rim height)";
+        }
+
+        physicsPanelText.text =
+            "SHOT PHYSICS\n" +
+            $"Angle: {launchAngle:0.0}°\n" +
+            $"Speed: {speed:0.00} m/s  (H {horizontalSpeed:0.00} / V {verticalSpeed:0.00})\n" +
+            $"Distance: {Mathf.Max(0f, distance):0.00} m\n" +
+            $"Height: {releasePoint.y:0.00} → {hoopCenter.y:0.00} m\n" +
+            $"Flight time: {flightTime:0.00} s\n" +
+            $"Apex: {apexHeight:0.00} m\n" +
+            $"Ideal speed: {idealSpeed}\n" +
+            $"Landing: {rangeResult}";
     }
 
     bool CrossesHoop(Vector3 start, Vector3 end, float verticalSpeed)
