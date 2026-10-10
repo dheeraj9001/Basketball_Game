@@ -54,6 +54,9 @@ public static class BasketballSceneSetup
 
     static void EnsureSceneSetup()
     {
+         if (EditorApplication.isPlayingOrWillChangePlaymode)
+        return;
+
         if (setupDone || EditorApplication.isCompiling || EditorApplication.isPlayingOrWillChangePlaymode) return;
         if (EditorSceneManager.GetActiveScene().path != ScenePath) return;
         GameObject savedRoot = GameObject.Find("Basketball Game");
@@ -92,8 +95,10 @@ public static class BasketballSceneSetup
             return;
         }
 
-        foreach (BasketballGameController oldController in Object.FindObjectsOfType<BasketballGameController>())
+        foreach (BasketballGameController oldController in Object.FindObjectsByType<BasketballGameController>(FindObjectsSortMode.None))
+        {
             Undo.DestroyObjectImmediate(oldController);
+        }
 
         var gameRoot = NewGroup("Basketball Game", null, scene);
         var environment = NewGroup("Environment", gameRoot.transform, scene);
@@ -119,7 +124,7 @@ public static class BasketballSceneSetup
         FitModelHeight(playerModel, 1.75f);
         var playerCollider = playerRoot.AddComponent<CapsuleCollider>();
         playerCollider.height = 1.75f;
-        playerCollider.radius = .34f;
+        playerCollider.radius = .25f;
         playerCollider.center = new Vector3(0f, .875f, 0f);
         var playerBody = playerRoot.AddComponent<Rigidbody>();
         playerBody.isKinematic = false;
@@ -172,7 +177,8 @@ public static class BasketballSceneSetup
 
         var cameras = NewGroup("Camera Rig", gameRoot.transform, scene);
         Camera camera = Camera.main;
-        if (camera == null) camera = Object.FindObjectOfType<Camera>();
+        if (camera == null)
+            camera = Object.FindFirstObjectByType<Camera>();
         if (camera != null)
         {
             camera.transform.SetParent(cameras.transform, true);
@@ -182,10 +188,16 @@ public static class BasketballSceneSetup
             camera.transform.rotation = Quaternion.LookRotation(hoopPosition + Vector3.up * .15f - camera.transform.position, Vector3.up);
         }
         var lighting = NewGroup("Lighting", environment.transform, scene);
-        foreach (Light light in Object.FindObjectsOfType<Light>())
-            if (light.transform.root != gameRoot.transform) light.transform.SetParent(lighting.transform, true);
-        foreach (Volume volume in Object.FindObjectsOfType<Volume>())
-            if (volume.transform.root != gameRoot.transform) volume.transform.SetParent(lighting.transform, true);
+        foreach (Light light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+        {
+            if (light.transform.root != gameRoot.transform)
+                light.transform.SetParent(lighting.transform, true);
+        }
+        foreach (Volume volume in Object.FindObjectsByType<Volume>(FindObjectsSortMode.None))
+        {
+            if (volume.transform.root != gameRoot.transform)
+                volume.transform.SetParent(lighting.transform, true);
+        }
 
         var uiAndSystems = NewGroup("UI & Systems", gameRoot.transform, scene);
         var managerObject = NewGroup("Game Manager (HUD + Input)", uiAndSystems.transform, scene);
@@ -236,6 +248,29 @@ public static class BasketballSceneSetup
                 EditorUtility.SetDirty(body);
                 changed = true;
             }
+        }
+        var capsule = player != null ? player.GetComponent<CapsuleCollider>() : null;
+        if (capsule != null)
+        {
+            bool colliderChanged = !Mathf.Approximately(capsule.height, 1.75f)
+                                || !Mathf.Approximately(capsule.radius, .25f)
+                                || capsule.center != new Vector3(0f, .875f, 0f);
+            capsule.height = 1.75f;
+            capsule.radius = .25f;
+            capsule.center = new Vector3(0f, .875f, 0f);
+            if (colliderChanged)
+            {
+                EditorUtility.SetDirty(capsule);
+                changed = true;
+            }
+        }
+        if (player != null && !Mathf.Approximately(player.position.y, 0f))
+        {
+            Vector3 groundedPosition = player.position;
+            groundedPosition.y = 0f;
+            player.position = groundedPosition;
+            EditorUtility.SetDirty(player);
+            changed = true;
         }
         BasketballGameController manager = gameRoot.GetComponentInChildren<BasketballGameController>(true);
         Transform systems = FindChild(gameRoot.transform, "UI & Systems");

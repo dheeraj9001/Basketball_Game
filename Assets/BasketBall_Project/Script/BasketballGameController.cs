@@ -49,6 +49,12 @@ public sealed class BasketballGameController : MonoBehaviour
 
     void Awake()
     {
+
+        if (playerAnimator == null)
+        {
+            playerAnimator = GetComponentInChildren<Animator>();
+        }
+
         arcProperties = new MaterialPropertyBlock();
         Physics.gravity = new Vector3(0f, -Gravity, 0f);
         Application.targetFrameRate = 60;
@@ -91,7 +97,19 @@ public sealed class BasketballGameController : MonoBehaviour
         playerController.SetAimYaw(yaw);
         playerController.SetVirtualMove(joystickValue);
         canvasUI.Refresh(score, attempts, resultText, charging, charge);
-        playerAnimator.SetBool("HasBall", held);
+
+        if (playerAnimator != null)
+        {
+            bool moving = joystickValue.sqrMagnitude > 0.01f;
+#if !(UNITY_ANDROID || UNITY_IOS)
+            moving |= Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.A)
+                   || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.D)
+                   || Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.DownArrow)
+                   || Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.RightArrow);
+#endif
+            playerAnimator.SetBool("IsWalking", moving && !charging);
+            playerAnimator.SetBool("IsAiming", charging);
+        }
 
         if (charging) charge = Mathf.Clamp01(charge + Time.deltaTime / chargeSeconds);
         if (held) UpdateArc(); else arcPreview.positionCount = 0;
@@ -188,6 +206,8 @@ public sealed class BasketballGameController : MonoBehaviour
     public void ReleaseShot()
     {
         if (!charging || !held) { charging = false; return; }
+        if (playerAnimator != null)
+            playerAnimator.Play("Base Layer.Aim", 0, 1f);
         charging = false;
         float speed = Mathf.Lerp(MinSpeed, MaxSpeed, charge);
         shotDirection = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
